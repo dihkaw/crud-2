@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 min-h-screen">
+<head>
+  <meta charset="UTF-8">
+  <title>CRUD Produk</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    function openForm(id = '', name = '', catalog = '', price = '', image = '') {
+      document.getElementById('form').classList.remove('hidden');
+      document.getElementById('form-id').value = id;
+      document.getElementById('name').value = name;
+      document.getElementById('catalog').value = catalog;
+      document.getElementById('price').value = price;
+    }
+    function closeForm() {
+      document.getElementById('form').classList.add('hidden');
+    }
+    function notify(msg) {
+      if (msg) {
+        alert(msg);
+      }
+    }
+    window.onload = () => notify('<%= msg %>');
+  </script>
+</head>
+<body class="p-6 text-white">
+
+  <div class="text-center mb-4">
+    <h1 class="text-3xl font-bold">Manajemen Produk</h1>
+    <button onclick="openForm()" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded mt-4">Tambah Produk</button>
+    <a href="/export" class="ml-4 bg-yellow-400 hover:bg-yellow-500 px-4 py-2 rounded">Export Excel</a>
+  </div>
+
+  <table class="w-full bg-white text-black rounded shadow-lg overflow-hidden">
+    <thead class="bg-gray-200">
+      <tr>
+        <th class="p-2">ID</th>
+        <th class="p-2">Nama</th>
+        <th class="p-2">Katalog</th>
+        <th class="p-2">Harga</th>
+        <th class="p-2">Gambar</th>
+        <th class="p-2">Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% data.forEach(p => { %>
+        <tr class="border-b">
+          <td class="p-2"><%= p.id %></td>
+          <td class="p-2"><%= p.name %></td>
+          <td class="p-2 capitalize"><%= p.catalog %></td>
+          <td class="p-2">Rp<%= parseFloat(p.price).toLocaleString() %></td>
+          <td class="p-2"><img src="<%= p.image_url %>" class="w-20 h-20 object-cover rounded" /></td>
+          <td class="p-2">
+            <button onclick="openForm('<%= p.id %>', '<%= p.name %>', '<%= p.catalog %>', '<%= p.price %>')" class="bg-blue-500 hover:bg-blue-600 px-2 py-1 rounded text-white">Edit</button>
+            <a href="/delete/<%= p.id %>" class="bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-white ml-1">Hapus</a>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <!-- Form Pop-up -->
+  <div id="form" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center hidden">
+    <form action="" method="post" enctype="multipart/form-data" class="bg-white p-6 rounded shadow text-black w-96 relative" onsubmit="this.action = document.getElementById('form-id').value ? '/update/' + document.getElementById('form-id').value : '/create'">
+      <h2 class="text-xl font-bold mb-4">Form Produk</h2>
+      <input type="hidden" id="form-id" name="id">
+      <div class="mb-2">
+        <label>Nama Barang</label>
+        <input type="text" id="name" name="name" required class="w-full border p-2 rounded">
+      </div>
+      <div class="mb-2">
+        <label>Katalog</label>
+        <select id="catalog" name="catalog" required class="w-full border p-2 rounded">
+          <option value="">--Pilih--</option>
+          <option value="furniture">Furniture</option>
+          <option value="electronic">Electronic</option>
+          <option value="food">Food</option>
+          <option value="fashion">Fashion</option>
+        </select>
+      </div>
+      <div class="mb-2">
+        <label>Harga</label>
+        <input type="number" id="price" name="price" required class="w-full border p-2 rounded">
+      </div>
+      <div class="mb-4">
+        <label>Gambar</label>
+        <input type="file" name="image" accept="image/*" class="w-full border p-2 rounded">
+      </div>
+      <div class="flex justify-between">
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Simpan</button>
+        <button type="button" onclick="closeForm()" class="bg-gray-400 text-white px-4 py-2 rounded">Tutup</button>
+      </div>
+    </form>
+  </div>
+
+  <footer class="text-center mt-10">
+    <p class="text-white text-sm">Server IP: <%= ip %></p>
+  </footer>
+</body>
+</html>

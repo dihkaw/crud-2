@@ -1,0 +1,31 @@
+{
+    "name": "crud-nodejs-s3-rds",
+    "version": "1.0.0",
+    "description": "CRUD Node.js dengan upload gambar ke S3 dan data ke Amazon RDS",
+    "main": "app.js",
+    "type": "module",
+    "scripts": {
+      "start": "node app.js"
+    },
+    "keywords": [
+      "crud",
+      "nodejs",
+      "aws",
+      "s3",
+      "rds",
+      "mysql"
+    ],
+    "author": "ChatGPT Dev Mode",
+    "license": "MIT",
+    "dependencies": {
+      "@aws-sdk/client-s3": "^3.540.0",
+      "dotenv": "^16.3.1",
+      "ejs": "^3.1.9",
+      "express": "^4.19.2",
+      "multer": "^1.4.5-lts.1",
+      "mysql2": "^3.9.7",
+      "os": "^0.1.2",
+      "xlsx": "^0.18.5"
+    }
+  }
+  
