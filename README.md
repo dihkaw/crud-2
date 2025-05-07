@@ -5,6 +5,7 @@ AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
 AWS_SESSION_TOKEN=your_aws_session_token
 AWS_REGION=your_aws_region
 S3_BUCKET_NAME=your_s3_bucket_name
+AWS_KMS_KEY_ID=your_kms_key_id_arn
 
 DB_HOST=your_rds_endpoint
 DB_USER=your_db_username
