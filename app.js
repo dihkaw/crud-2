@@ -3,8 +3,9 @@ import express from 'express';
 import multer from 'multer';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { createReadStream, readFileSync, readdirSync } from 'fs';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'; // [MODIFIED]
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'; // [ADDED]
+import { createReadStream, readFileSync } from 'fs'; // [MODIFIED]
 import { join } from 'path';
 import ejs from 'ejs';
 import os from 'os';
@@ -19,9 +20,9 @@ app.use(express.urlencoded({ extended: true }));
 
 app.set('views', './views');
 app.engine('ejs', (path, data, cb) => {
-    const template = readFileSync(path, 'utf8');
-    const html = ejs.render(template, data);
-    cb(null, html);
+  const template = readFileSync(path, 'utf8');
+  const html = ejs.render(template, data);
+  cb(null, html);
 });
 app.set('view engine', 'ejs');
 
@@ -42,21 +43,13 @@ const s3 = new S3Client({
   }
 });
 
-// 🔐 Fungsi untuk parameter upload ke S3 dengan KMS jika tersedia
-function getS3UploadParams(key, body, contentType = 'image/jpeg') {
-  const params = {
+// [ADDED] - Helper untuk membuat signed URL
+async function getSignedImageUrl(filename) {
+  const command = new GetObjectCommand({
     Bucket: process.env.S3_BUCKET_NAME,
-    Key: key,
-    Body: body,
-    ContentType: contentType
-  };
-
-  if (process.env.KMS_KEY_ID) {
-    params.ServerSideEncryption = 'aws:kms';
-    params.SSEKMSKeyId = process.env.KMS_KEY_ID;
-  }
-
-  return params;
+    Key: `products/${filename}`
+  });
+  return await getSignedUrl(s3, command, { expiresIn: 3600 }); // URL berlaku 1 jam
 }
 
 async function initializeDatabase() {
@@ -77,11 +70,15 @@ async function initializeDatabase() {
 
     for (let i = 0; i < 5; i++) {
       const fileStream = createReadStream(`public/dummy/${dummyImages[i]}`);
-      const uploadParams = getS3UploadParams(`products/${dummyImages[i]}`, fileStream);
-      await s3.send(new PutObjectCommand(uploadParams));
-      const imageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/products/${dummyImages[i]}`;
+      await s3.send(new PutObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: `products/${dummyImages[i]}`,
+        Body: fileStream,
+        ServerSideEncryption: 'aws:kms' // [OPTIONAL] hanya jika perlu KMS
+      }));
+      const signedUrl = await getSignedImageUrl(dummyImages[i]); // [MODIFIED]
       await pool.query('INSERT INTO products (name, catalog, price, image_url) VALUES (?, ?, ?, ?)', [
-        dummyNames[i], dummyCatalogs[i], dummyPrices[i], imageUrl
+        dummyNames[i], dummyCatalogs[i], dummyPrices[i], signedUrl
       ]);
     }
     console.log('Dummy data inserted.');
@@ -90,8 +87,13 @@ async function initializeDatabase() {
 
 app.get('/', async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM products');
+  const data = await Promise.all(rows.map(async row => {
+    const filename = row.image_url.split('/').pop();
+    const signedUrl = await getSignedImageUrl(`products/${filename}`);
+    return { ...row, image_url: signedUrl };
+  })); // [MODIFIED]
   const ip = Object.values(os.networkInterfaces()).flat().find(i => i.family === 'IPv4' && !i.internal)?.address;
-  res.render('index', { data: rows, msg: req.query.msg || '', ip });
+  res.render('index', { data, msg: req.query.msg || '', ip });
 });
 
 app.post('/create', upload.single('image'), async (req, res) => {
@@ -100,11 +102,14 @@ app.post('/create', upload.single('image'), async (req, res) => {
   const filename = Date.now() + '-' + req.file.originalname;
   const fileStream = createReadStream(req.file.path);
 
-  const uploadParams = getS3UploadParams(`products/${filename}`, fileStream, req.file.mimetype);
-  await s3.send(new PutObjectCommand(uploadParams));
-
-  const imageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/products/${filename}`;
-  await pool.query('INSERT INTO products (name, catalog, price, image_url) VALUES (?, ?, ?, ?)', [name, catalog, price, imageUrl]);
+  await s3.send(new PutObjectCommand({
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: `products/${filename}`,
+    Body: fileStream,
+    ServerSideEncryption: 'aws:kms' // [ADDED]
+  }));
+  const signedUrl = await getSignedImageUrl(`products/${filename}`); // [MODIFIED]
+  await pool.query('INSERT INTO products (name, catalog, price, image_url) VALUES (?, ?, ?, ?)', [name, catalog, price, signedUrl]);
   res.redirect('/?msg=Sukses menambahkan data');
 });
 
@@ -115,9 +120,13 @@ app.post('/update/:id', upload.single('image'), async (req, res) => {
   if (req.file) {
     const filename = Date.now() + '-' + req.file.originalname;
     const fileStream = createReadStream(req.file.path);
-    const uploadParams = getS3UploadParams(`products/${filename}`, fileStream, req.file.mimetype);
-    await s3.send(new PutObjectCommand(uploadParams));
-    imageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/products/${filename}`;
+    await s3.send(new PutObjectCommand({
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: `products/${filename}`,
+      Body: fileStream,
+      ServerSideEncryption: 'aws:kms' // [ADDED]
+    }));
+    imageUrl = await getSignedImageUrl(`products/${filename}`); // [MODIFIED]
   }
   if (imageUrl) {
     await pool.query('UPDATE products SET name=?, catalog=?, price=?, image_url=? WHERE id=?', [name, catalog, price, imageUrl, id]);
