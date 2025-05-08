@@ -1,7 +1,3 @@
-bantu update kode app.js untuk memastikan penggunaan SigV4 yang sesuai untuk KMS
-
-script app.js sebelumnya:
-
 import express from 'express';
 import multer from 'multer';
 import mysql from 'mysql2/promise';
